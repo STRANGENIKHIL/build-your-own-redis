@@ -1,7 +1,18 @@
 {
   "name": "course-sdk",
+  "version": "1.0.0",
+  "description": "CLI tool to develop, compile, and test CodeCrafters challenges across multiple languages",
+  "author": "Nikhil Pathak <nikhilstrange4@gmail.com>",
+  "license": "MIT",
   "module": "cli.ts",
   "type": "module",
+  "scripts": {
+    "build": "bun build ./cli.ts --compile --outfile=main.out",
+    "test": "bun test",
+    "lint": "prettier --check \"**/*.ts\"",
+    "format": "prettier --write \"**/*.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
     "@types/mustache": "^4.2.5",
     "bun-types": "latest"
