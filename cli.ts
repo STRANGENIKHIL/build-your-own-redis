@@ -86,4 +86,16 @@ program
     await new ClearCacheCommand().run();
   });
 
+program.addHelpText(
+  "after",
+  `
+Examples:
+  $ course-sdk compile go                  # Compile starter code & solutions for Go
+  $ course-sdk test python                 # Compile and run stage tests for Python
+  $ course-sdk test rust --no-compile      # Run stage tests without recompiling
+  $ course-sdk add-language rust           # Bootstrap starter templates for Rust
+  $ course-sdk clear-cache                 # Clear cached templates and images
+`
+);
+
 program.parse();
