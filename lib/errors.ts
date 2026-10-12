@@ -84,3 +84,23 @@ export class YourProgramScriptFoundBeforeCompilationError extends FriendlyError 
     );
   }
 }
+
+export class DockerConnectionError extends FriendlyError {
+  constructor(details?: string) {
+    super(
+      `Cannot connect to the Docker daemon. Is Docker running on your system?${
+        details ? `\nDetails: ${details}` : ""
+      }`
+    );
+  }
+}
+
+export class StageNotFoundError extends FriendlyError {
+  constructor(stageSlug: string, availableStages: string[]) {
+    super(
+      `Stage '${stageSlug}' was not found in this course definition.\nAvailable stages: ${availableStages.join(
+        ", "
+      )}`
+    );
+  }
+}
