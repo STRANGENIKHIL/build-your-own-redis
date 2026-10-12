@@ -27,6 +27,16 @@ export default class Logger {
     console.log(color.green(Logger.#prefixUnlessEmpty(msg, "  - ")));
   }
 
+  static logWarning(msg: string): void {
+    console.log(color.magenta(Logger.#prefixUnlessEmpty(msg, "  ! ")));
+  }
+
+  static logDebug(msg: string): void {
+    if (process.env.DEBUG || process.env.VERBOSE) {
+      console.log(color.gray(Logger.#prefixUnlessEmpty(msg, "  [debug] ")));
+    }
+  }
+
   static #prefixUnlessEmpty(msg: string, prefix: string): string {
     return msg === "" ? "" : prefix + msg;
   }
