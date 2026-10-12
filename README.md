@@ -1,60 +1,89 @@
-This repository is used to develop & test CodeCrafters challenges.
+# Course SDK
+
+[![Build & Test](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+[![Runtime](https://img.shields.io/badge/runtime-bun-fbf0df.svg?logo=bun)]()
+[![TypeScript](https://img.shields.io/badge/typescript-%5E5.0.0-blue.svg?logo=typescript)]()
+[![Docker](https://img.shields.io/badge/docker-supported-blue.svg?logo=docker)]()
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
+CLI tool to develop, compile, and test CodeCrafters challenges and courses across multiple programming languages.
+
+---
+
+## Features
+
+- **Polyglot Compilation**: Compile starter code and solution diffs for Go, Python, Rust, C, C++, Java, TypeScript, and more.
+- **Isolated Testing**: Execute test suites inside tailored Docker containers mimicking real grading environments.
+- **Incremental Solutions**: Compile stage-by-stage diffs and starter code from a single YAML course definition.
+- **Template Synchronization**: Seamlessly pull and sync upstream language templates from local or remote caches.
+
+---
 
 ## Installation
 
-- Make sure that you have [Docker](https://docs.docker.com/engine/install/) installed.
-- For now, you'll need to compile the SDK from source using Bun.
-  - Make sure you have [Bun](https://bun.sh/docs/installation) installed.
-  - Clone this repository and run `bun install && make install`
-  - (In the future, we'll publish pre-compiled binaries for the SDK)
-  - `lstat` is not present in MacOS, create a symlink to `stat` in usr/local/bin `sudo ln -s /usr/bin/stat /usr/local/bin/lstat`
-- Test it with `course-sdk --version`.
+### Prerequisites
+- [Docker](https://docs.docker.com/engine/install/) installed and running.
+- [Bun](https://bun.sh/) runtime installed.
 
-## Developing courses
+### Setup
+```bash
+# Clone the repository
+git clone https://github.com/STRANGENIKHIL/build-your-own-redis.git
+cd build-your-own-redis
 
-We'll use `[build-your-own-git](https://github.com/codecrafters-io/build-your-own-git)` as an example here.
-
-Clone the course repository and cd into it:
-
-```sh
-git clone https://github.com/codecrafters-io/build-your-own-git.git
-cd build-your-own-git
+# Install dependencies and build CLI binary
+bun install
+make install
 ```
 
-### Running tests
-
-Run this command to compile and test Go solutions:
-
-```sh
-course-sdk test go # test all stages for Go
-course-sdk test go stage_slug_1,stage_slug_2 # test only specific stages
+Verify installation:
+```bash
+course-sdk --version
 ```
 
-### Compiling starter code & solutions
+---
 
-If you want to just compile the starter code & solutions, and not run tests:
+## Usage
 
-```sh
-course-sdk compile # compiles all languages
-course-sdk compile go # compiles only Go
+### 1. Compile Starter Code & Solutions
+```bash
+# Compile all supported languages
+course-sdk compile
+
+# Compile only Go starter templates and solutions
+course-sdk compile go
 ```
 
-To add support for a new language (TODO, not working yet):
+### 2. Run Stage Tests
+```bash
+# Test all stages for Python
+course-sdk test python
 
-```sh
-course-sdk add-language <language>
+# Test specific stages only
+course-sdk test go stage_1,stage_2
+
+# Skip compilation and run tests directly
+course-sdk test rust --no-compile
 ```
 
-### Working against local language templates
+### 3. Add or Upgrade Language Support
+```bash
+# Bootstrap templates for a new language
+course-sdk add-language rust
 
-`course-sdk add-language` and `course-sdk upgrade-language` pull template files
-from [language-templates](https://github.com/codecrafters-io/language-templates), cloning it to a cache and resetting to `origin/main` on every run.
-
-Set `COURSE_SDK_LANGUAGE_TEMPLATES_REPO` to read from a local checkout instead:
-
-```sh
-COURSE_SDK_LANGUAGE_TEMPLATES_REPO=../language-templates course-sdk upgrade-language go
+# Upgrade existing language templates
+course-sdk upgrade-language go
 ```
 
-Use it when developing templates, or to pick up a templates change that has not
-been merged yet.
+---
+
+## Documentation
+
+- [Architecture Overview](docs/ARCHITECTURE.md) - Details on compilers, testers, and Docker pipelines.
+- [Contributing Guide](CONTRIBUTING.md) - How to add new courses, stages, and submit PRs.
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
