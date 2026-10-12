@@ -1,0 +1,311 @@
+# This workflow is invoked by course repositories to test course definitions.
+name: Test Course Definition
+
+on:
+  workflow_call:
+    inputs:
+      sdkRef:
+        required: false
+        type: string
+        default: main
+
+jobs:
+  verify_templates_compiled:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    timeout-minutes: 5
+
+    steps:
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.2 # Error: 1.2.3 breaks course-sdk as of 2025-02-27
+
+      - uses: actions/checkout@v3
+        with:
+          repository: "codecrafters-io/course-sdk"
+          ref: ${{inputs.sdkRef}}
+
+      - uses: actions/checkout@v3
+        with:
+          path: courses/${{github.event.repository.name}}
+
+      # - uses: depot/setup-action@v1
+      # - uses: depot/build-push-action@v1
+      #   with:
+      #     project: tsp80qbtxw
+      #     context: .
+      #     load: true
+      #     tags: tester:depot
+
+      - run: bun install
+      - run: make install
+
+      - run: course-sdk compile
+        working-directory: courses/${{github.event.repository.name}}
+
+      - name: "Ensure no uncommitted changes to compiled templates"
+        run: git diff --exit-code
+        working-directory: courses/${{github.event.repository.name}}
+
+      - name: "Print untracked files"
+        run: git ls-files compiled_starters/ --exclude-standard --others
+        working-directory: courses/${{github.event.repository.name}}
+
+      - name: "Ensure untracked files are empty (check previous step for list of files)"
+        run: test -z "$(git ls-files compiled_starters/ --exclude-standard --others)"
+        working-directory: courses/${{github.event.repository.name}}
+
+  lint:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    timeout-minutes: 5
+
+    steps:
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.2 # Error: 1.2.3 breaks course-sdk as of 2025-02-27
+
+      - uses: actions/checkout@v3
+        with:
+          repository: "codecrafters-io/course-sdk"
+          ref: ${{inputs.sdkRef}}
+
+      - uses: actions/checkout@v3
+        with:
+          path: courses/${{github.event.repository.name}}
+
+      - run: bun install
+      - run: make install
+
+      - name: "Lint using course-sdk"
+        run: course-sdk lint
+        working-directory: courses/${{github.event.repository.name}}
+
+  identify_language_slugs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    outputs:
+      language_slugs: ${{ steps.generate-language-slugs.outputs.language_slugs }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Generate Language Slugs
+        id: generate-language-slugs
+        run: |-
+          LANGUAGE_SLUGS=$(ls solutions | jq -Rnc '[inputs]')
+          echo ::set-output name=language_slugs::${LANGUAGE_SLUGS}
+
+  test:
+    runs-on: ubuntu-latest
+
+    # Avoid leaking secrets to forked PRs
+    if: github.event.pull_request.head.repo.fork == false
+
+    permissions:
+      contents: read
+
+    timeout-minutes: 20
+
+    needs:
+      - identify_language_slugs
+
+    strategy:
+      matrix:
+        language: ${{ fromJSON(needs.identify_language_slugs.outputs.language_slugs) }}
+
+    steps:
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.2 # Error: 1.2.3 breaks course-sdk as of 2025-02-27
+
+      - uses: actions/checkout@v3
+        with:
+          repository: "codecrafters-io/course-sdk"
+          ref: ${{inputs.sdkRef}}
+
+      - run: bun install
+      - run: make install
+
+      - uses: actions/checkout@v3
+        with:
+          path: courses/${{github.event.repository.name}}
+
+      - run: "echo ::remove-matcher owner=go::" # Messes with our output
+
+      # - uses: depot/setup-action@v1
+      # - uses: depot/build-push-action@v1
+      #   with:
+      #     project: tsp80qbtxw
+      #     context: .
+      #     load: true
+      #     tags: tester:depot
+
+      - run: git config --global user.email "hello@codecrafters.io"
+      - run: git config --global user.name "codecrafters-bot"
+
+      - run: course-sdk test ${{matrix.language}}
+        working-directory: courses/${{github.event.repository.name}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Figure out a way to allow course-specific environment variables
+          CODECRAFTERS_SECRET_OPENROUTER_API_KEY: ${{ secrets.CODECRAFTERS_SECRET_OPENROUTER_API_KEY }}
+
+  validate-schemas:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: "codecrafters-io/course-sdk"
+          ref: ${{inputs.sdkRef}}
+
+      - uses: actions/checkout@v3
+        with:
+          path: courses/${{github.event.repository.name}}
+
+      # - uses: depot/setup-action@v1
+      # - uses: depot/build-push-action@v1
+      #   with:
+      #     project: tsp80qbtxw
+      #     context: .
+      #     load: true
+      #     tags: js-tools
+
+      - run: docker compose run js-tools ajv validate --spec draft2020 -s schemas/course-definition.json -d courses/${{github.event.repository.name}}/course-definition.yml
+
+  validate-stages-naming:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: "codecrafters-io/course-sdk"
+          ref: ${{inputs.sdkRef}}
+
+      - uses: actions/checkout@v3
+        with:
+          path: courses/${{github.event.repository.name}}
+
+      - run: scripts/validate_stages_naming.sh "courses/${{github.event.repository.name}}"
+
+  test_stage_descriptions:
+    name: test_stage_descriptions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Avoid leaking secrets to forked PRs
+    if: github.event.pull_request.head.repo.fork == false
+
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+
+    steps:
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.2
+  
+      - uses: actions/checkout@v4
+        with:
+          repository: "codecrafters-io/course-sdk"
+          ref: ${{ inputs.sdkRef }}
+  
+      - uses: actions/checkout@v4
+        with:
+          path: courses/${{ github.event.repository.name }}
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+  
+      - uses: actions/checkout@v4
+        with:
+          repository: codecrafters-io/llm-rules-test
+          ref: master
+          path: tools/llm-linter
+  
+      - name: Install linter deps
+        working-directory: tools/llm-linter
+        run: bun install
+
+      - name: Verify linter scripts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x tools/llm-linter/scripts/*.sh || true
+  
+      - name: Compute target stage files
+        id: targets
+        shell: bash
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          OWNER_REPO: ${{ github.repository }}
+          COURSE_DIR: ${{ github.workspace }}/courses/${{ github.event.repository.name }}
+          OUT_ZLIST: ${{ github.workspace }}/targets.zlist
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tools/llm-linter/scripts/compute_targets.sh
+  
+      - name: Run LLM rules
+        if: steps.targets.outputs.none == 'false'
+        id: run_linter
+        shell: bash
+        env:
+          LLM_RULE_EVALUATOR_OPENAI_API_KEY: ${{ secrets.LLM_RULE_EVALUATOR_OPENAI_API_KEY }}
+          MODEL: gpt-5
+          LINTER_DIR: tools/llm-linter
+          ZLIST: ${{ steps.targets.outputs.zlist }}
+        run: tools/llm-linter/scripts/run_linter.sh
+  
+      - name: Convert JSON → JUnit
+        if: steps.targets.outputs.none == 'false'
+        working-directory: tools/llm-linter
+        env:
+          REPO_ROOT: ${{ github.workspace }}/courses/${{ github.event.repository.name }}
+        run: bun scripts/json_to_junit.mjs
+
+      - name: Upload JUnit XML
+        if: steps.targets.outputs.none == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-lint-junit
+          path: tools/llm-linter/reports/junit.xml
+
+      - name: Render PR comment markdown
+        if: steps.targets.outputs.none == 'false'
+        working-directory: tools/llm-linter
+        run: bun scripts/render_pr_comment.mjs > pr-comment.md
+      
+      - name: Upsert PR comment
+        if: steps.targets.outputs.none == 'false'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: tools/llm-linter/pr-comment.md
+          edit-mode: replace
+
+      # Publish test results as a Check + PR annotations
+      - name: Publish Test Results
+        if: steps.targets.outputs.none == 'false'
+        uses: EnricoMi/publish-unit-test-result-action@v2.20.0
+        with:
+          files: tools/llm-linter/reports/junit.xml
+          check_name: "LLM Doc Lint"
+          report_individual_runs: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
